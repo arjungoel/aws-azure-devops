@@ -1,0 +1,125 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  This template deploys AWS IAM Functional User in AWS account.
+Parameters:
+  FunctionalUserName:
+    Type: String
+    Description: Name of the IAM Functional User
+  ReadOnlyBucketARN:
+    Type: String
+    Description: ARN of the buckets to grant read permissions
+  s3WriteBucketAccess:
+    Type: String
+    Description: ARN of the buckets to grant write permissions
+  KMSARN:
+    Type: String
+    Description: ARN of KMS key/s for the bucket above 
+  PrimaryOwner:
+    Type: String
+    Description: Primary Owner for this user
+  SecondaryOwner:
+    Type: String
+    Description: Secondary Owner for this user
+  CostCentre:
+    Type: String
+    Description: Cost Centre
+  BusinessUnit:
+    Type: String
+    Description: Business Unit
+
+Conditions:
+  S3WriteBucketAccessProvided: !Not [!Equals [!Ref s3WriteBucketAccess, ""]]
+  S3ReadBucketAccessProvided: !Not [!Equals [!Ref ReadOnlyBucketARN, ""]]
+  KMSKeysProvided: !Not [!Equals [!Ref KMSARN, ""]]
+
+Resources:
+  FuncUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: !Ref FunctionalUserName
+      Tags:
+        - Key: primary_owner
+          Value: !Ref PrimaryOwner
+        - Key: secondary_owner
+          Value: !Ref SecondaryOwner
+        - Key: cost_centre
+          Value: !Ref CostCentre
+        - Key: business_unit
+          Value: !Ref BusinessUnit
+
+  AccessPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Users:
+        - !Ref FunctionalUserName
+      ManagedPolicyName: !Sub "${FunctionalUserName}_access_policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - !If
+            - S3ReadBucketAccessProvided
+            - Sid: "S3ReadAccess"
+              Effect: "Allow"
+              Action:
+                - "s3:List*"
+                - "s3:Get*"
+              Resource: !Split
+                - ","
+                - !Ref ReadOnlyBucketARN
+            - !Ref "AWS::NoValue"
+          - !If
+            - S3WriteBucketAccessProvided
+            - Sid: "S3WriteAccess"
+              Effect: "Allow"
+              Action:
+                - "s3:PutAnalyticsConfiguration"
+                - "s3:AbortMultipartUpload"
+                - "s3:PutBucketVersioning"
+                - "s3:PutLifecycleConfiguration"
+                - "s3:PutInventoryConfiguration"
+                - "s3:DeleteObjectVersion"
+                - "s3:RestoreObject"
+                - "s3:DeleteObject"
+                - "s3:DeleteObjectTagging"
+                - "s3:PutObjectVersionTagging"
+                - "s3:DeleteObjectVersionTagging"
+                - "s3:PutObject*"
+                - "s3:PutBucketNotification"
+              Resource: !Split
+                - ","
+                - !Ref s3WriteBucketAccess
+            - !Ref "AWS::NoValue"
+          - !If
+            -  KMSKeysProvided
+            - Sid: "KMSKeysAccess"
+              Effect: "Allow"
+              Action:
+                - "kms:Decrypt"
+                - "kms:Encrypt"
+                - "kms:DescribeKey"
+                - "kms:ReEncrypt*"
+                - "kms:GenerateDataKey*"
+                - "kms:RevokeGrant"
+                - "kms:ListGrants"
+                - "kms:CreateGrant"
+              Resource: !Split
+                - ","
+                - !Ref KMSARN
+            - !Ref "AWS::NoValue"
+          - Effect: "Allow"
+            Action:
+              - s3:ListAllMyBuckets
+              - s3:HeadBucket
+            Resource: "*"
+            Condition:
+              Bool:
+                aws:SecureTransport:
+                  - True
+          - Effect: "Allow"
+            Action:
+              - "kms:ListAliases"
+            Resource: "*"
+            Condition:
+              Bool:
+                aws:SecureTransport:
+                  - True  
