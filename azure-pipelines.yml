@@ -10,10 +10,10 @@ pool:
   vmImage: ubuntu-latest
 
 steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
-
-- script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+- task: CloudFormationCreateOrUpdateStack@1
+  inputs:
+    regionName: 'ca-central-1'
+    stackName: 'create-iam-user'
+    templateSource: 's3'
+    s3BucketName: 'azure-devops-aws-cloudformation'
+    s3ObjectKey: 'create-iam-user.yml'
